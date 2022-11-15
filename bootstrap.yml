@@ -1,0 +1,23 @@
+---
+- hosts: localhost
+  connection: local
+  vars:
+    hostname: "{{ ansible_limit }}"
+  tasks:
+    - name: check if host exists in inventory
+      set_fact:
+        found_host: "{{ lookup('awx.awx.controller_api', 'hosts', query_params={ 'name': hostname }) }}"
+
+    - name: Update all inventory sources
+      inventory_source_update:
+        name: "{{ item }}"
+        inventory: "My Dynamic Inventory"
+        timeout: 60
+      loop: "{{ query('awx.awx.controller_api', 'inventory_sources', query_params={ 'inventory': 30 }, return_ids=True ) }}"
+      ignore_errors: true
+      when: found_host is not defined # This might need to change. I am not sure exactly what the lookup will return if the host doesn't exist
+    
+    - name: Launch Job
+      job_launch:
+        job_template: "base_linux_job"
+        limit: "{{ hostname }}"
